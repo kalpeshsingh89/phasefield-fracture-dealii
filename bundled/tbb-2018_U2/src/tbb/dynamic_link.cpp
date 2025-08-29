@@ -148,20 +148,34 @@ OPEN_INTERNAL_NAMESPACE
     }
 
 #if __TBB_WIN8UI_SUPPORT
-    bool dynamic_link( const char*  library, const dynamic_link_descriptor descriptors[], size_t required, dynamic_link_handle*, int flags ) {
+    bool dynamic_link( const char*  library, const dynamic_link_descriptor descriptors[], size_t required, dynamic_link_handle* handle, int flags ) {
         dynamic_link_handle tmp_handle = NULL;
         TCHAR wlibrary[256];
         if ( MultiByteToWideChar(CP_UTF8, 0, library, -1, wlibrary, 255) == 0 ) return false;
         if ( flags & DYNAMIC_LINK_LOAD )
             tmp_handle = LoadPackagedLibrary( wlibrary, 0 );
         if (tmp_handle != NULL){
-            return resolve_symbols(tmp_handle, descriptors, required);
+            if ( resolve_symbols(tmp_handle, descriptors, required) ) {
+                save_library_handle( tmp_handle, handle );
+                return true;
+            } else {
+                FreeLibrary( tmp_handle );
+                return false;
+            }
         }else{
             return false;
         }
     }
-    void dynamic_unlink( dynamic_link_handle ) {}
-    void dynamic_unlink_all() {}
+    void dynamic_unlink( dynamic_link_handle handle ) {
+        if ( handle ) {
+            FreeLibrary( handle );
+        }
+    }
+    void dynamic_unlink_all() {
+    #if __TBB_DYNAMIC_LOAD_ENABLED
+        handles.free();
+    #endif
+    }
 #else
 #if __TBB_DYNAMIC_LOAD_ENABLED
 /*
